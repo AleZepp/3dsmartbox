@@ -2595,14 +2595,22 @@ const EXTRA={
 /* ---------------- stato persistente ---------------- */
 const SEED_VERSION="e69ba8d3";
 /* ---------- modalità online (Firebase) ---------- */
-const ONLINE=/(^|\.)3dsmartbox\.net$|\.web\.app$|\.firebaseapp\.com$/.test(location.hostname);
+const FB_CONFIG={
+  apiKey:"AIzaSyAki13M3mlRUkdSohJNvDOxFwQ3C2wWyUQ",
+  authDomain:"dsmartbox-a6f4c.firebaseapp.com",
+  projectId:"dsmartbox-a6f4c",
+  storageBucket:"dsmartbox-a6f4c.firebasestorage.app",
+  messagingSenderId:"1034921145039",
+  appId:"1:1034921145039:web:0fc1188fad933556d17dba"
+};
+const ONLINE=/(^|\.)3dsmartbox\.net$|\.web\.app$|\.firebaseapp\.com$|\.github\.io$/.test(location.hostname);
 const COURSE="3dsmartbox", FBV="10.12.2";
 const ADMIN_NOTE="";
 let FS=null, AUTH=null, CLOUD_OK=false, pTimer=null, FBCFG=null;
 function loadScript(src){ return new Promise((ok,ko)=>{ const e=document.createElement("script"); e.src=src; e.onload=ok; e.onerror=ko; document.head.appendChild(e); }); }
 async function cloudInit(){
   for(const m of ["app","auth","firestore"]) await loadScript(`https://www.gstatic.com/firebasejs/${FBV}/firebase-${m}-compat.js`);
-  const cfg=await (await fetch("/__/firebase/init.json")).json();
+  const cfg=FB_CONFIG||await (await fetch("/__/firebase/init.json")).json();
   FBCFG=cfg; firebase.initializeApp(cfg); FS=firebase.firestore(); AUTH=firebase.auth();
   const sh=await FS.collection("courses").doc(COURSE).collection("sheets").get();
   if(!sh.empty){ const S={}; const parts=[]; sh.forEach(d=>parts.push(d.data())); parts.sort((a,b)=>a.name<b.name?-1:a.name>b.name?1:a.i-b.i);
