@@ -2597,6 +2597,11 @@ const EXTRA={
  results:X("See the results","Ergebnisse ansehen","Vedi i risultati","Zobacz wyniki","Ver los resultados"),
  home:X("Back to start","Zurück zum Anfang","Torna all’inizio","Wróć na początek","Volver al inicio"),
  cert_ok:X("Your certificate","Ihre Bescheinigung","Il tuo attestato","Twoje zaświadczenie","Tu certificado"),
+ f_email_opt:X("Email address (optional: only if you want to receive the certificate by email as well)","E-Mail-Adresse (optional: nur wenn Sie die Bescheinigung auch per E-Mail erhalten möchten)","Indirizzo email (facoltativo: solo se vuoi ricevere l’attestato anche per email)","Adres e-mail (opcjonalnie: tylko jeśli chcesz otrzymać zaświadczenie również e-mailem)","Correo electrónico (opcional: solo si quieres recibir el certificado también por correo)"),
+ email_bad:X("The email address is not valid. Correct it or leave the field empty.","Die E-Mail-Adresse ist ungültig. Korrigieren Sie sie oder lassen Sie das Feld leer.","L’indirizzo email non è valido. Correggilo oppure lascia vuoto il campo.","Adres e-mail jest nieprawidłowy. Popraw go lub pozostaw pole puste.","El correo electrónico no es válido. Corrígelo o deja el campo vacío."),
+ mail_fail:X("Sending the certificate by email was not possible: please keep the downloaded PDF.","Der Versand der Bescheinigung per E-Mail war nicht möglich: Bitte bewahren Sie das heruntergeladene PDF auf.","Non è stato possibile inviare l’attestato per email: conserva il PDF scaricato.","Nie udało się wysłać zaświadczenia e-mailem: zachowaj pobrany plik PDF.","No ha sido posible enviar el certificado por correo electrónico: conserva el PDF descargado."),
+ mail_sent_to:X("The certificate has also been sent to {a}. If you cannot find it, check your spam folder.","Die Bescheinigung wurde außerdem an {a} gesendet. Prüfen Sie gegebenenfalls den Spam-Ordner.","L’attestato è stato inviato anche a {a}. Se non lo trovi, controlla la posta indesiderata.","Zaświadczenie zostało również wysłane na adres {a}. Jeśli go nie widzisz, sprawdź folder spam.","El certificado se ha enviado también a {a}. Si no lo encuentras, revisa la carpeta de spam."),
+ done_box:X("✓ Module completed on {a}. You can review the content or retake the quiz at any time.","✓ Modul abgeschlossen am {a}. Sie können die Inhalte jederzeit wiederholen oder das Quiz erneut machen.","✓ Modulo completato il {a}. Puoi rivedere i contenuti o rifare il quiz quando vuoi.","✓ Moduł ukończony {a}. W każdej chwili możesz wrócić do treści lub ponownie rozwiązać quiz.","✓ Módulo completado el {a}. Puedes repasar los contenidos o repetir el cuestionario cuando quieras."),
  required:X("Fill in the required fields and accept the notice.","Füllen Sie die Pflichtfelder aus und akzeptieren Sie den Hinweis.","Compila i campi obbligatori e accetta l’informativa.","Wypełnij wymagane pola i zaakceptuj informację.","Rellena los campos obligatorios y acepta el aviso."),
  why:X("Why","Warum","Perché","Dlaczego","Por qué"),
  correct_was:X("The correct answer","Die richtige Antwort","La risposta corretta","Prawidłowa odpowiedź","La respuesta correcta"),
@@ -2866,6 +2871,7 @@ function renderModule(){
   const m=byId(st.mod); const p=P();
   const src=imgSrc(m.immagine);
   let h=`<section class="panel"><p class="small">${esc(m.icona)} ${esc(L((MODEL.sections.find(s=>s.id===m.sezione)||{}).titolo))}</p><h2>${esc(L(m.titolo))}</h2>`;
+  if(p.done[m.id]) h+=`<div class="caution" role="status" style="margin:.4rem 0 1rem;border-left-color:var(--go);background:var(--okbg)"><b>${esc(fill(T("done_box"),new Date(p.done[m.id]).toLocaleDateString(LOC[st.lang]||"en-GB"),""))}</b></div>`;
   if(src) h+=`<figure class="pic"><img src="${esc(src)}" alt="${esc(L(m.immagine_alt))}"></figure>`;
   h+=`<p class="lead">${esc(L(m.introduzione))}</p>`;
   if(L(m.da_ricordare)) h+=`<div class="remember"><span class="rk">${esc(T("remember"))}</span>${esc(L(m.da_ricordare))}</div>`;
@@ -2972,7 +2978,7 @@ function renderCert(){
   <label class="lbl" for="cn">${esc(T("f_name"))} *</label><input class="field" id="cn" autocomplete="given-name">
   <label class="lbl" for="cs">${esc(T("f_surname"))} *</label><input class="field" id="cs" autocomplete="family-name">
   <label class="lbl" for="co">${esc(T("f_org"))}</label><input class="field" id="co" autocomplete="organization">
-  <label class="lbl" for="ce">${esc(T("f_email"))} *</label><input class="field" id="ce" type="email" autocomplete="email">
+  <label class="lbl" for="ce">${esc(T("f_email_opt"))}</label><input class="field" id="ce" type="email" autocomplete="email">
   <label class="chk" style="margin-top:1rem"><input type="checkbox" id="cc"> <span style="font-weight:400">${esc(T("f_consent"))}</span></label>
   <p style="margin:.3rem 0 0"><button class="adminlink" type="button" onclick="showPrivacy()">${esc(T("priv_read"))}</button></p>
   <p id="cerr" class="err" role="alert"></p>
@@ -3034,20 +3040,35 @@ function buildCert(d,m,when,rec,o){
 async function sendCert(){
   const v=id=>document.getElementById(id).value.trim();
   const d={nome:v("cn"), cognome:v("cs"), org:v("co"), email:v("ce")};
-  if(!d.nome||!d.cognome||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)||!document.getElementById("cc").checked){ document.getElementById("cerr").textContent=T("required"); return; }
+  if(!d.nome||!d.cognome||!document.getElementById("cc").checked){ document.getElementById("cerr").textContent=T("required"); return; }
+  if(d.email&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)){ document.getElementById("cerr").textContent=T("email_bad"); return; }
   const m=byId(st.mod), when=new Date();
   const rec=Object.assign({id:newBadgeCode(), t:when.toISOString(), modulo:m.id, titolo:Object.assign({},m.titolo), lingua:st.lang, code:DB.cur},d);
   rec.hash=await badgeHash(rec);
   DB.certs.push(rec); save(); log("certificato_richiesto",{modulo:m.id, badge:rec.id});
-  if(ONLINE){ cloudAdd("certs",rec); if(CLOUD_OK) FS.collection("badges").doc(rec.id).set({nome:rec.nome, cognome:rec.cognome, modulo:rec.modulo, titolo:rec.titolo, t:rec.t, hash:rec.hash, revocato:false}).catch(e=>console.error(e)); }
+  let badgeP=Promise.resolve();
+  if(ONLINE){ cloudAdd("certs",rec); if(CLOUD_OK) badgeP=FS.collection("badges").doc(rec.id).set({nome:rec.nome, cognome:rec.cognome, modulo:rec.modulo, titolo:rec.titolo, t:rec.t, hash:rec.hash, revocato:false}).catch(e=>console.error(e)); }
   let doc=null; const fname="3D-Smartbox_"+m.id+"_"+rec.id+".pdf";
   try{ doc=buildCert(d,m,when,rec); }catch(e){ console.error(e); }
-  const fin=ok=>dlg(`<h2>${esc(T("cert_ok"))}</h2><p>${esc(ok?T("cert_dl"):(doc?T("dl_no"):T("cert_none")))}</p>
+  const fin=(ok,ms)=>dlg(`<h2>${esc(T("cert_ok"))}</h2><p>${esc(ok?T("cert_dl"):(doc?T("dl_no"):T("cert_none")))}</p>${ms==="ok"?`<p class="okt"><b>${esc(fill(T("mail_sent_to"),rec.email,""))}</b></p>`:ms==="fail"?`<p class="err">${esc(T("mail_fail"))}</p>`:""}
     <div class="badgebox">${qrSvg(badgeUrl(rec.id))}<div><b>${esc(T("badge_label"))}</b><br><span class="small">${esc(T("f_code"))}</span><br><b class="mono">${esc(rec.id)}</b><br><span class="small">SHA-256 ${esc(fpShort(rec.hash))}</span></div></div>
     <div class="row"><button class="ghost" onclick="closeDlg(); go('verify',{vcode:'${rec.id}'})">${esc(T("verify_link"))}</button><button class="go" onclick="closeDlg(); go('home')">${esc(T("close"))}</button></div>`);
   if(!doc){ fin(false); return; }
   let blob=null; try{ blob=doc.output("blob"); }catch(e){}
-  offerFile(fname, blob||doc.output("arraybuffer"), ()=>doc.save(fname)).then(fin);
+  const mailP=mailCert(rec,m,doc,fname,badgeP);
+  offerFile(fname, blob||doc.output("arraybuffer"), ()=>doc.save(fname)).then(async ok=>fin(ok, await mailP));
+}
+/* ---------- invio dell'attestato per email (Google Apps Script) ---------- */
+async function mailCert(rec,m,doc,fname,badgeP){
+  const url=(MODEL.settings.url_invio_email||"").trim(); if(!url||!rec.email||!CLOUD_OK||!doc) return "";
+  try{ await badgeP;
+    const pdf=doc.output("datauristring").split(",").pop();
+    const r=await fetch(url,{method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({badge:rec.id, nome:rec.nome, cognome:rec.cognome, email:rec.email, lingua:rec.lingua, modulo:L(m.titolo), verifica:badgeUrl(rec.id), file:fname, mittente:(MODEL.settings.email_mittente||"").trim(), pdf})});
+    const j=await r.json();
+    if(j&&j.ok){ log("certificato_inviato",{modulo:m.id, badge:rec.id}); return "ok"; }
+    console.error("invio email:",j); return "fail";
+  }catch(e){ console.error(e); return "fail"; }
 }
 function qrSvg(text){ try{ const q=qrcode(0,"M"); q.addData(text); q.make(); return q.createSvgTag({cellSize:3,margin:2,scalable:true}); }catch(e){ return ""; } }
 /* ---------- pagina di verifica ---------- */
@@ -3235,7 +3256,7 @@ function adminOut(){ st.admin=false; st.grid=null; if(CLOUD_OK){ AUTH.signOut();
 function aTab(t){ st.atab=t; render(); window.scrollTo(0,0); }
 function renderAdmin(){
   document.body.classList.add("admin"); document.documentElement.style.fontSize="20px";
-  const all=[["contenuti","Moduli e domande",["super","editor"]],["valutazione","Valutazione e gradimento",["super","editor"]],["excel","File Excel",["super","editor"]],["cartaceo","Risultati in presenza",["super","formatore"]],["stampa","Materiali da stampare",["super","editor","formatore"]],["partecipanti","Partecipanti",["super"]],["impostazioni","Lingue e impostazioni",["super"]],["statistiche","Statistiche",["super"]],["amministratori","Amministratori",["super"]]];
+  const all=[["contenuti","Moduli e domande",["super","editor"]],["valutazione","Valutazione e gradimento",["super","editor"]],["excel","File Excel",["super","editor"]],["cartaceo","Sessioni di formazione",["super","formatore"]],["stampa","Materiali da stampare",["super","editor","formatore"]],["partecipanti","Partecipanti",["super"]],["impostazioni","Lingue e impostazioni",["super"]],["statistiche","Statistiche",["super"]],["amministratori","Amministratori",["super"]]];
   const tabs=all.filter(t=>t[2].includes(st.role)); if(!tabs.some(t=>t[0]===st.atab)) st.atab=tabs[0][0];
   let h=`<div class="adm"><div class="adm-top"><h1>3D Smartbox · amministrazione</h1><div class="tabs">${tabs.map(([k,v])=>`<button aria-pressed="${st.atab===k}" onclick="aTab('${k}')">${v}</button>`).join("")}</div>${CLOUD_OK&&["super","formatore"].includes(st.role)?`<button class="btn" id="refbtn" onclick="refreshAdmin()">⟳ Aggiorna dati</button>`:""}<button class="btn" onclick="adminOut()">Torna al corso</button></div>`;
   h+=`<p class="small" style="margin:-.4rem 0 .8rem">Accesso come ${({super:"super amministratore",editor:"amministratore dei contenuti",formatore:"formatore"})[st.role]}${CLOUD_OK&&AUTH.currentUser?" · "+esc(AUTH.currentUser.email):""}${CLOUD_OK&&st.loadedAt&&st.role!=="editor"?" · dati letti alle "+st.loadedAt.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"}):""}</p>`;
@@ -3348,7 +3369,8 @@ function admSettings(){
   h+=`<div class="card"><h3>Completamento e certificati</h3><div class="fgrid">
    <div><label class="lbl">Risposte corrette necessarie (0–1)</label><input class="field" value="${esc(s.soglia_completamento||"0,67")}" onchange="setSetting('soglia_completamento',this.value)"></div>
    <div><label class="lbl">Certificati attivi</label><select class="field" onchange="setSetting('certificato_attivo',this.value)"><option ${s.certificato_attivo!=="NO"?"selected":""}>SI</option><option ${s.certificato_attivo==="NO"?"selected":""}>NO</option></select></div>
-   <div><label class="lbl">Mittente delle email</label><input class="field" value="${esc(s.email_mittente||"")}" onchange="setSetting('email_mittente',this.value)"></div>
+   <div><label class="lbl">Nome del mittente delle email</label><input class="field" value="${esc(s.email_mittente||"")}" placeholder="3D Smartbox Learning Platform" onchange="setSetting('email_mittente',this.value)"></div>
+   <div style="grid-column:span 2"><label class="lbl">Indirizzo dello script per l'invio degli attestati per email (termina con /exec; vuoto = invio disattivato)</label><input class="field" value="${esc(s.url_invio_email||"")}" placeholder="https://script.google.com/macros/s/…/exec" onchange="setSetting('url_invio_email',this.value.trim())"></div>
    <div><label class="lbl">Pulsante assistente</label><select class="field" onchange="setSetting('assistente_attivo',this.value)"><option ${s.assistente_attivo!=="NO"?"selected":""}>SI</option><option ${s.assistente_attivo==="NO"?"selected":""}>NO</option></select></div>
    <div><label class="lbl">Nome dell'assistente</label><input class="field" value="${esc(s.assistente_nome||"Gemini")}" onchange="setSetting('assistente_nome',this.value)"></div>
    <div style="grid-column:span 2"><label class="lbl">Indirizzo dell'assistente ({q} = domanda)</label><input class="field" value="${esc(s.assistente_url||"https://gemini.google.com/app")}" onchange="setSetting('assistente_url',this.value)"></div>
@@ -3587,7 +3609,7 @@ function admPrint(){
 }
 /* ======================= RISULTATI IN PRESENZA ======================= */
 function emptyRow(){ return {code:"",nome:"",cognome:"",org:"",email:"",paese:"",m:{},pre:{},post:{}}; }
-function gridInit(){ if(!st.grid) st.grid={rows:Array.from({length:5},emptyRow), sess:{data:new Date().toISOString().slice(0,10), luogo:"", paese:"", lingua:MODEL.langs.includes("it")?"it":MODEL.langs[0], n:""}}; return st.grid; }
+function gridInit(){ if(!st.grid) st.grid={rows:Array.from({length:5},emptyRow), sess:{data:new Date().toISOString().slice(0,10), modalita:"presenza", luogo:"", paese:"", lingua:MODEL.langs.includes("it")?"it":MODEL.langs[0], n:""}}; return st.grid; }
 function gridCols(full){
   if(full===undefined) full=!!st.gfull;
   const c=[{k:"nome",h:"Nome",w:9},{k:"cognome",h:"Cognome",w:9},{k:"org",h:"Organizzazione",w:11}];
@@ -3630,6 +3652,9 @@ function gAdd(n){ const g=gridInit(); for(let i=0;i<n;i++) g.rows.push(emptyRow(
 function gDel(i){ const g=gridInit(); g.rows.splice(i,1); if(!g.rows.length) g.rows.push(emptyRow()); render(); }
 function gClear(){ if(!confirm("Svuotare la tabella? I dati non salvati andranno persi.")) return; st.grid=null; render(); }
 function sSet(k,v){ gridInit().sess[k]=v; }
+function gFillAssess(){ const g=gridInit(), base=gridCols(false); let n=0;
+  g.rows.forEach(r=>{ if(!rowFilled(r,base)&&!rowFilled(r,gridCols(true))) return; MODEL.assess.forEach(v=>{ r.pre=r.pre||{}; r.post=r.post||{}; if(!String(r.pre[v.id]||"").trim()){ r.pre[v.id]="1"; n++; } if(!String(r.post[v.id]||"").trim()){ r.post[v.id]="5"; n++; } }); });
+  st.gfull=true; render(); toast(n?`Compilate ${n} caselle di autovalutazione`:"Nessuna casella da compilare: scrivi prima almeno un dato nella riga"); }
 function gridPaste(e){
   const t=e.target; if(!t||!t.dataset||t.dataset.r===undefined) return;
   const text=(e.clipboardData||window.clipboardData).getData("text"); if(!/[\t\n]/.test(text.replace(/\s+$/,""))) return;
@@ -3689,10 +3714,15 @@ async function saveRow(r,sid,sessT,s){
   quizMods().forEach(m=>{ const v=String((r.m||{})[m.id]||"").trim().toUpperCase(); if(!v) return; let sc=0;
     if(/^\d+$/.test(v)) sc=+v; else m.questions.forEach((q,i)=>{ const a=v[i]==="-"?null:paperAns(q,v[i]); if(a){ p.qa[q.id]=a.id; if(a.corretta) sc++; } });
     p.best[m.id]=Math.max(p.best[m.id]||0,sc); if(sc>=needed(m.questions.length)&&!p.done[m.id]) p.done[m.id]=sessT; });
+  quizMods().forEach(m=>{ if(String((r.m||{})[m.id]||"").trim()||p.best[m.id]!=null) return;
+    p.best[m.id]=m.questions.length; m.questions.forEach(q=>{ const a=q.answers.find(x=>x.corretta); if(a&&!p.qa[q.id]) p.qa[q.id]=a.id; }); if(!p.done[m.id]) p.done[m.id]=sessT; });
+  MODEL.modules.forEach(m=>{ if(!p.done[m.id]) p.done[m.id]=sessT; });
   ["pre","post"].forEach(f=>{ const vs=MODEL.assess.filter(v=>String((r[f]||{})[v.id]||"").trim()); if(!vs.length) return;
     const ris={}, sum={}, cnt={}; vs.forEach(v=>{ ris[v.id]=parseInt(r[f][v.id],10); sum[v.area]=(sum[v.area]||0)+ris[v.id]; cnt[v.area]=(cnt[v.area]||0)+1; });
     const aree={}; Object.keys(sum).forEach(k=>aree[k]=Math.round(sum[k]/cnt[k]*100)/100); const arr=Object.values(ris);
     p[f]={t:sessT, risposte:ris, aree, media:Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*100)/100}; });
+  [["pre",1],["post",5]].forEach(([f,val])=>{ if(p[f]) return; const ris={}, aree={}; MODEL.assess.forEach(v=>{ ris[v.id]=val; aree[v.area]=val; });
+    if(MODEL.assess.length) p[f]={t:sessT, risposte:ris, aree, media:val, assegnato:true}; });
   p.last=new Date().toISOString(); DB.participants[code]=p;
   const old=DB.anag[code]||{};
   const an=Object.assign({},old,{nome:String(r.nome||"").trim(), cognome:String(r.cognome||"").trim(), org:String(r.org||"").trim(), email:String(r.email||"").trim(), paese:p.paese, ins_da:old.ins_da||adminEmail(), ins_t:old.ins_t||new Date().toISOString(), sessione:old.sessione||(isNew?sid:""), agg_t:new Date().toISOString()});
@@ -3705,18 +3735,19 @@ async function saveGrid(){
   if(!s.data){ toast("Indica la data della sessione."); return; }
   const rows=g.rows.filter(r=>rowFilled(r,cols)), errs=[];
   rows.forEach(r=>cols.forEach(c=>{ const e=cellErr(c.k,getCell(r,c.k)); if(e) errs.push(`Riga ${g.rows.indexOf(r)+1}, ${c.h}: ${e}`); }));
+  rows.forEach(r=>["pre","post"].forEach(f=>{ const k=MODEL.assess.filter(v=>String((r[f]||{})[v.id]||"").trim()).length; if(k&&k<MODEL.assess.length) errs.push(`Riga ${g.rows.indexOf(r)+1}: la valutazione ${f==="pre"?"iniziale":"finale"} è compilata solo in parte (${k} su ${MODEL.assess.length}). Completala o usa «Completa pre (1) e post (5)».`); }));
   const newRows=rows.filter(r=>!String(r.code||"").trim()), nIn=parseInt(s.n,10);
   if(!isNaN(nIn)&&nIn<newRows.length) errs.push(`I partecipanti presenti (${nIn}) non possono essere meno delle righe compilate (${newRows.length}).`);
   if(errs.length){ dlg(`<h2>Da correggere prima di salvare</h2><ul>${errs.slice(0,40).map(e=>`<li class="err">${esc(e)}</li>`).join("")}</ul>${errs.length>40?`<p>…e altri ${errs.length-40}.</p>`:""}<button class="btn pri" onclick="closeDlg()">Chiudi</button>`); return; }
   const nPart=isNaN(nIn)?newRows.length:nIn, anon=nPart-newRows.length;
   if(!rows.length&&!(nPart>0)){ toast("Indica il numero dei partecipanti presenti oppure compila la tabella."); return; }
-  if(anon>0&&!confirm(`Verranno registrati ${nPart} partecipanti: ${newRows.length} con i dati della tabella e ${anon} senza nome. Tutti risulteranno iscritti il ${s.data} e con tutti i moduli superati. Procedere?`)) return;
+  if(anon>0&&!confirm(`Verranno registrati ${nPart} partecipanti: ${newRows.length} con i dati della tabella e ${anon} senza nome. Tutti risulteranno iscritti il ${s.data} e con tutti i moduli superati; dove mancano i risultati si registrano il punteggio massimo e l’autovalutazione 1 (iniziale) e 5 (finale). Procedere?`)) return;
   const btns=document.querySelectorAll(".savebtn"); btns.forEach(b=>{ b.disabled=true; b.textContent="Salvataggio in corso…"; });
   const now=new Date().toISOString(), sessT=new Date(s.data+"T12:00:00").toISOString();
   const sid="S-"+s.data.replace(/-/g,"")+"-"+Math.random().toString(36).slice(2,7).toUpperCase();
   let done=0;
   try{
-    if(nPart>0){ const sess={data:s.data, luogo:s.luogo, paese:s.paese||"", lingua:s.lingua, partecipanti:nPart, schede:newRows.length, ins_da:adminEmail(), ins_t:now};
+    if(nPart>0){ const sess={data:s.data, modalita:s.modalita==="online"?"online":"presenza", luogo:s.luogo, paese:s.paese||"", lingua:s.lingua, partecipanti:nPart, schede:newRows.length, ins_da:adminEmail(), ins_t:now};
       if(CLOUD_OK) await FS.collection("sessioni").doc(sid).set(sess); DB.sessioni.push(Object.assign({id:sid},sess)); }
     for(const r of rows){ await saveRow(r,sid,sessT,s); done++; }
     for(let i=0;i<anon;i++){ await saveRow(emptyRow(),sid,sessT,s); done++; }
@@ -3739,17 +3770,17 @@ function myEntries(){ const em=adminEmail(); return Object.entries(DB.anag||{}).
 /* ---------- attestato di partecipazione al corso (sessioni in presenza) ---------- */
 const COURSE_TITLE="3D Smartbox – 3D Printing in Education";
 const CC_TXT={
- en:{t:"CERTIFICATE OF ATTENDANCE",a:"This is to certify that",m:"attended the training course",w:p=>p?"held in person in "+p:"held in person",v:"Training course"},
- de:{t:"TEILNAHMEBESCHEINIGUNG",a:"Hiermit wird bestätigt, dass",m:"an folgender Fortbildung teilgenommen hat",w:p=>p?"in Präsenz durchgeführt in "+p:"in Präsenz durchgeführt",v:"Fortbildung"},
- it:{t:"ATTESTATO DI PARTECIPAZIONE",a:"Si attesta che",m:"ha partecipato al corso di formazione",w:p=>p?"svolto in presenza a "+p:"svolto in presenza",v:"Corso di formazione"},
- pl:{t:"ZAŚWIADCZENIE O UCZESTNICTWIE",a:"Niniejszym zaświadcza się, że",m:"uczestniczył(a) w szkoleniu",w:p=>p?"przeprowadzonym stacjonarnie – "+p:"przeprowadzonym stacjonarnie",v:"Szkolenie"},
- es:{t:"CERTIFICADO DE PARTICIPACIÓN",a:"Se certifica que",m:"ha participado en el curso de formación",w:p=>p?"impartido de forma presencial en "+p:"impartido de forma presencial",v:"Curso de formación"}};
+ en:{t:"CERTIFICATE OF ATTENDANCE",a:"This is to certify that",m:"attended the training course",w:(p,o)=>o?(p?"held online by "+p:"held online"):(p?"held in person in "+p:"held in person"),v:"Training course"},
+ de:{t:"TEILNAHMEBESCHEINIGUNG",a:"Hiermit wird bestätigt, dass",m:"an folgender Fortbildung teilgenommen hat",w:(p,o)=>o?(p?"online durchgeführt von "+p:"online durchgeführt"):(p?"in Präsenz durchgeführt in "+p:"in Präsenz durchgeführt"),v:"Fortbildung"},
+ it:{t:"ATTESTATO DI PARTECIPAZIONE",a:"Si attesta che",m:"ha partecipato al corso di formazione",w:(p,o)=>o?(p?"svolto online a cura di "+p:"svolto online"):(p?"svolto in presenza a "+p:"svolto in presenza"),v:"Corso di formazione"},
+ pl:{t:"ZAŚWIADCZENIE O UCZESTNICTWIE",a:"Niniejszym zaświadcza się, że",m:"uczestniczył(a) w szkoleniu",w:(p,o)=>o?(p?"przeprowadzonym online – "+p:"przeprowadzonym online"):(p?"przeprowadzonym stacjonarnie – "+p:"przeprowadzonym stacjonarnie"),v:"Szkolenie"},
+ es:{t:"CERTIFICADO DE PARTICIPACIÓN",a:"Se certifica que",m:"ha participado en el curso de formación",w:(p,o)=>o?(p?"impartido en línea por "+p:"impartido en línea"):(p?"impartido de forma presencial en "+p:"impartido de forma presencial"),v:"Curso de formación"}};
 async function courseRec(code){
   const p=DB.participants[code], a=DB.anag[code]; if(!p||!a||!a.nome||!a.cognome) return null;
   if(a.cert_corso) return a.cert_corso;
   const ses=DB.sessioni.find(x=>x.id===a.sessione), when=ses?new Date(ses.data+"T12:00:00"):new Date(p.created||Date.now());
   const rec={id:newBadgeCode(), t:when.toISOString(), modulo:"corso", tipo:"corso", titolo:Object.fromEntries(LANGS_ALL.map(l=>[l,CC_TXT[l].v+" "+COURSE_TITLE])),
-    lingua:(ses&&ses.lingua)||p.lang||st.lang, luogo:(ses&&ses.luogo)||"", code, nome:a.nome, cognome:a.cognome, org:a.org||"", email:a.email||""};
+    lingua:(ses&&ses.lingua)||p.lang||st.lang, luogo:(ses&&ses.luogo)||"", modalita:(ses&&ses.modalita)||"presenza", code, nome:a.nome, cognome:a.cognome, org:a.org||"", email:a.email||""};
   rec.hash=await badgeHash(rec); a.cert_corso=rec; DB.certs.push(rec); save();
   if(CLOUD_OK){ await FS.collection("anagrafica").doc(code).set(a); cloudAdd("certs",rec);
     await FS.collection("badges").doc(rec.id).set({nome:rec.nome, cognome:rec.cognome, modulo:rec.modulo, titolo:rec.titolo, t:rec.t, hash:rec.hash, revocato:false}); }
@@ -3757,7 +3788,7 @@ async function courseRec(code){
 }
 function drawCourseCert(rec,doc){
   const keep=st.lang; st.lang=MODEL.langs.includes(rec.lingua)?rec.lingua:keep; const X=CC_TXT[st.lang]||CC_TXT.en;
-  try{ return buildCert({nome:rec.nome, cognome:rec.cognome, org:rec.org},null,new Date(rec.t),rec,{doc, t:X.t, a:X.a, m:X.m, title:COURSE_TITLE, w:X.w(rec.luogo)}); }
+  try{ return buildCert({nome:rec.nome, cognome:rec.cognome, org:rec.org},null,new Date(rec.t),rec,{doc, t:X.t, a:X.a, m:X.m, title:COURSE_TITLE, w:X.w(rec.luogo, (rec.modalita||((DB.sessioni.find(x=>x.id===(DB.anag[rec.code]||{}).sessione)||{}).modalita))==="online")}); }
   finally{ st.lang=keep; }
 }
 async function courseCert(code){
@@ -3780,27 +3811,29 @@ async function delSession(id){
 }
 function admPaper(){
   const g=gridInit(), s=g.sess, em=adminEmail(), ok=typeof XLSX!=="undefined";
-  let h=`<div class="card"><h3>Sessione in presenza</h3><p class="small">Indica la data della sessione e il numero dei partecipanti presenti. Ogni presente viene aggiunto all’elenco dei partecipanti con la data della sessione come data di iscrizione e con tutti i moduli superati. Chi è scritto nella tabella qui sotto viene registrato con i suoi dati; gli altri presenti, fino al numero indicato, vengono registrati senza nome e si possono completare in seguito con «Modifica».</p>
+  let h=`<div class="card"><h3>Sessione di formazione</h3><p class="small">Indica la data, la modalità (in presenza oppure online) e il numero dei partecipanti. Ogni partecipante viene aggiunto all’elenco con la data della sessione come data di iscrizione e con tutti i moduli superati. Chi è scritto nella tabella qui sotto viene registrato con i suoi dati; gli altri, fino al numero indicato, vengono registrati senza nome e si possono completare in seguito con «Modifica». Per i moduli senza risultato si registra il punteggio massimo; se l’autovalutazione non è compilata si registrano 1 nella valutazione iniziale e 5 in quella finale.</p>
   <div class="fgrid"><div><label class="lbl" for="s_d">Data</label><input class="field" id="s_d" type="date" value="${esc(s.data)}" onchange="sSet('data',this.value)"></div>
+  <div><label class="lbl" for="s_m">Modalità</label><select class="field" id="s_m" onchange="sSet('modalita',this.value)"><option value="presenza" ${s.modalita!=="online"?"selected":""}>In presenza</option><option value="online" ${s.modalita==="online"?"selected":""}>Online</option></select></div>
   <div><label class="lbl" for="s_l">Luogo o istituzione ospitante</label><input class="field" id="s_l" value="${esc(s.luogo)}" onchange="sSet('luogo',this.value)"></div>
   <div><label class="lbl" for="s_p">Paese della sessione</label><select class="field" id="s_p" onchange="sSet('paese',this.value)">${countryOpts(s.paese,"it")}</select></div>
   <div><label class="lbl" for="s_g">Lingua dei materiali e dell’attestato</label><select class="field" id="s_g" onchange="sSet('lingua',this.value)">${MODEL.langs.map(l=>`<option value="${l}" ${s.lingua===l?"selected":""}>${LNAME[l]}</option>`).join("")}</select></div>
-  <div><label class="lbl" for="s_n">Partecipanti presenti</label><input class="field" id="s_n" type="number" min="0" value="${esc(s.n)}" placeholder="= righe compilate" onchange="sSet('n',this.value)"></div></div></div>`;
+  <div><label class="lbl" for="s_n">Partecipanti</label><input class="field" id="s_n" type="number" min="0" value="${esc(s.n)}" placeholder="= righe compilate" onchange="sSet('n',this.value)"></div></div></div>`;
   h+=`<div class="card"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;align-items:center"><h3 style="margin:0">Partecipanti della sessione</h3>
   <div class="lt" role="group" aria-label="Tipo di tabella"><button aria-pressed="${!st.gfull}" onclick="st.gfull=false;render()">Solo dati anagrafici</button><button aria-pressed="${!!st.gfull}" onclick="st.gfull=true;render()">Con i risultati dei test</button></div></div>
   <p class="small">Una riga per partecipante; tutte le colonne sono facoltative. ${st.gfull?"Nelle colonne dei moduli scrivi il numero di risposte corrette oppure le lettere segnate sul foglio, una per domanda nell’ordine del quiz stampato (per esempio BAC; un trattino per una domanda senza risposta). Nelle colonne Pre e Post scrivi un valore da 1 a 5. I risultati servono alle statistiche: chi partecipa in presenza risulta comunque aver superato tutti i moduli.":"Per inserire anche i risultati dei test fatti in classe passa alla tabella «Con i risultati dei test»."} La colonna Codice serve solo a correggere un partecipante già inserito. Puoi incollare un blocco di celle copiato da Excel, oppure caricare il file preparato dal formatore sul modello Excel.</p>
   ${gridHTML()}
   <div class="row" style="margin-top:.6rem;flex-wrap:wrap;gap:.5rem"><button class="btn" onclick="gAdd(5)">+ 5 righe</button><button class="btn" onclick="gAdd(20)">+ 20 righe</button><button class="btn" onclick="gClear()">Svuota la tabella</button>
+  <button class="btn" onclick="gFillAssess()" title="Compila le caselle vuote: 1 nella valutazione iniziale, 5 in quella finale">Completa pre (1) e post (5)</button>
   <button class="btn" onclick="exportTemplate()" ${ok?"":"disabled"}>Scarica il modello Excel</button>
   <label class="btn" style="display:inline-flex;align-items:center">Carica il file del formatore<input type="file" accept=".xlsx,.xls,.csv" onchange="importGrid(this)" style="display:none" ${ok?"":"disabled"}></label></div>
   <div class="row" style="margin-top:.8rem"><button class="btn pri savebtn" onclick="saveGrid()">Salva la sessione e i partecipanti</button></div></div>`;
   const ent=myEntries(), sd=id=>{ const x=DB.sessioni.find(y=>y.id===id); return x?x.data:""; };
-  h+=`<div class="card"><h3>Partecipanti in presenza ${st.role==="super"?"":"inseriti da te"} (${ent.length})</h3><p class="small">Fanno parte dell’elenco unico dei partecipanti. L’attestato di partecipazione al corso si stampa per chi ha nome e cognome.</p><div class="scroll"><table class="t"><tr><th>Codice</th><th>Nome</th><th>Cognome</th><th>Organizzazione</th><th>Paese</th><th>Sessione</th>${st.role==="super"?"<th>Inserito da</th>":""}<th></th></tr>
+  h+=`<div class="card"><h3>Partecipanti delle sessioni ${st.role==="super"?"":"inseriti da te"} (${ent.length})</h3><p class="small">Fanno parte dell’elenco unico dei partecipanti. L’attestato di partecipazione al corso si stampa per chi ha nome e cognome.</p><div class="scroll"><table class="t"><tr><th>Codice</th><th>Nome</th><th>Cognome</th><th>Organizzazione</th><th>Paese</th><th>Sessione</th>${st.role==="super"?"<th>Inserito da</th>":""}<th></th></tr>
   ${ent.length?ent.slice(0,400).map(([c,a])=>{ const p=DB.participants[c]||{}; return `<tr><td class="mono">${esc(c)}</td><td>${esc(a.nome)||'<span class="small">senza nome</span>'}</td><td>${esc(a.cognome)}</td><td>${esc(a.org)}</td><td>${esc(p.paese?cName(p.paese,"it"):"")}</td><td>${esc(sd(a.sessione))}</td>${st.role==="super"?`<td>${esc(a.ins_da)}</td>`:""}<td style="white-space:nowrap"><button class="btn" onclick="gLoad('${c}')">Modifica</button> <button class="btn" onclick="courseCert('${c}')" ${a.nome&&a.cognome?"":"disabled"}>${a.cert_corso?"Ristampa attestato":"Attestato"}</button></td></tr>`; }).join(""):`<tr><td colspan="8">Nessun partecipante inserito.</td></tr>`}</table></div>${ent.length>400?`<p class="small">Sono mostrati i 400 più recenti.</p>`:""}</div>`;
   const ses=DB.sessioni.filter(x=>st.role==="super"||x.ins_da===em).sort((a,b)=>String(b.data).localeCompare(String(a.data)));
   const named=sid=>Object.values(DB.anag).filter(a=>a.sessione===sid&&a.nome&&a.cognome).length;
-  h+=`<div class="card"><h3>Sessioni registrate (${ses.length})</h3><div class="scroll"><table class="t"><tr><th>Data</th><th>Luogo</th><th>Paese</th><th>Presenti</th><th>Con nome</th><th>Lingua</th>${st.role==="super"?"<th>Inserita da</th>":""}<th></th></tr>
-  ${ses.length?ses.map(x=>`<tr><td>${esc(x.data)}</td><td>${esc(x.luogo)}</td><td>${esc(x.paese?cName(x.paese,"it"):"")}</td><td class="n">${x.partecipanti||0}</td><td class="n">${named(x.id)}</td><td>${esc(x.lingua||"")}</td>${st.role==="super"?`<td>${esc(x.ins_da)}</td>`:""}<td style="white-space:nowrap"><button class="btn" onclick="sessionCerts('${x.id}')" ${named(x.id)?"":"disabled"}>Attestati della sessione (PDF)</button> <button class="btn danger" onclick="delSession('${x.id}')">Elimina</button></td></tr>`).join(""):`<tr><td colspan="8">Nessuna sessione registrata.</td></tr>`}</table></div></div>`;
+  h+=`<div class="card"><h3>Sessioni registrate (${ses.length})</h3><div class="scroll"><table class="t"><tr><th>Data</th><th>Modalità</th><th>Luogo</th><th>Paese</th><th>Partecipanti</th><th>Con nome</th><th>Lingua</th>${st.role==="super"?"<th>Inserita da</th>":""}<th></th></tr>
+  ${ses.length?ses.map(x=>`<tr><td>${esc(x.data)}</td><td>${x.modalita==="online"?"online":"in presenza"}</td><td>${esc(x.luogo)}</td><td>${esc(x.paese?cName(x.paese,"it"):"")}</td><td class="n">${x.partecipanti||0}</td><td class="n">${named(x.id)}</td><td>${esc(x.lingua||"")}</td>${st.role==="super"?`<td>${esc(x.ins_da)}</td>`:""}<td style="white-space:nowrap"><button class="btn" onclick="sessionCerts('${x.id}')" ${named(x.id)?"":"disabled"}>Attestati della sessione (PDF)</button> <button class="btn danger" onclick="delSession('${x.id}')">Elimina</button></td></tr>`).join(""):`<tr><td colspan="9">Nessuna sessione registrata.</td></tr>`}</table></div></div>`;
   return h;
 }
 /* ======================= ELENCO UNICO DEI PARTECIPANTI ======================= */
