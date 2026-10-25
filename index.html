@@ -3706,11 +3706,27 @@ function gridPaste(e){
   render(); if(bad.length) dlg(`<h2>Paesi non riconosciuti</h2><p>Sceglili dal menu nelle righe indicate.</p><ul>${bad.map(b=>`<li>${esc(b)}</li>`).join("")}</ul><button class="btn pri" onclick="closeDlg()">Chiudi</button>`);
 }
 /* modello Excel e caricamento */
-function tplHeaders(){ return gridCols(true).map(c=>c.k.startsWith("m:")?`${c.h} – ${c.t} (${c.max})`:c.k.startsWith("pre:")||c.k.startsWith("post:")||c.k.startsWith("grad:")?c.h.toUpperCase():c.h); }
+function tplHeaders(){ return gridCols(true).map(c=>c.k.startsWith("m:")?`${c.h} – ${c.t} (${c.max})`:c.k.startsWith("pre:")||c.k.startsWith("post:")||c.k.startsWith("grad:")?`${c.h.toUpperCase()} – ${String(c.t).split(" · ").slice(1).join(" · ")} (1–5)`:c.h); }
+/* foglio con tutte le domande e le risposte possibili, nella lingua della sessione */
+function tplQuestions(lang){
+  const sc=pre=>[1,2,3,4,5].map(k=>k+" = "+TL((pre?"scala_":"gradimento_")+k,lang)).join(" · ");
+  const R=[["Colonna","Domanda","Risposte possibili da inserire"]];
+  R.push(["","AUTOVALUTAZIONE INIZIALE (PRE) E FINALE (POST): stesse affermazioni, prima e dopo il corso",""]);
+  MODEL.assess.forEach(v=>R.push(["PRE "+v.id+" / POST "+v.id, Lx(v.testo,lang), v.tipo==="conoscenza"?v.answers.map((a,i)=>i+1+" = "+Lx(a.testo,lang)).join(" · "):sc(true)]));
+  R.push(["","",""],["","QUESTIONARIO DI GRADIMENTO (alla fine del corso)",""]);
+  MODEL.survey.filter(g=>g.tipo==="scala").forEach(g=>R.push(["GRAD "+g.id, Lx(g.testo,lang), sc(false)]));
+  R.push(["","Le domande aperte del questionario («"+MODEL.survey.filter(g=>g.tipo!=="scala").map(g=>Lx(g.testo,lang)).join("», «")+"») non si inseriscono nella tabella.",""]);
+  R.push(["","",""],["","QUIZ DEI MODULI: nella colonna del modulo scrivere il numero di risposte corrette oppure le lettere segnate, una per domanda nell’ordine qui sotto (per esempio BAC; un trattino per una domanda senza risposta). Le lettere sono le stesse del quiz stampato.",""]);
+  quizMods().forEach(m=>{ R.push([m.id.toUpperCase(), Lx(m.titolo,lang), m.questions.length+" domande"]);
+    m.questions.forEach((q,i)=>R.push([m.id.toUpperCase()+" · domanda "+(i+1), Lx(q.testo,lang), paperOrder(q).map((ai,j)=>LETTERS[j]+" = "+Lx(q.answers[ai].testo,lang)).join("  ·  ")])); });
+  const ws=XLSX.utils.aoa_to_sheet(R); ws["!cols"]=[{wch:24},{wch:80},{wch:90}]; return ws;
+}
 function exportTemplate(){
   const wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet([tplHeaders()]);
-  ws["!cols"]=gridCols(true).map(c=>({wch:c.k.startsWith("m:")?14:c.k.includes(":")?9:16}));
+  ws["!cols"]=gridCols(true).map(c=>({wch:c.k.startsWith("m:")?14:c.k.includes(":")?18:16}));
   XLSX.utils.book_append_sheet(wb,ws,"Risultati");
+  const tl=(gridInit().sess.lingua&&MODEL.langs.includes(gridInit().sess.lingua))?gridInit().sess.lingua:"it";
+  XLSX.utils.book_append_sheet(wb,tplQuestions(tl),"Domande e risposte");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Istruzioni"],
     ["Una riga per partecipante. Tutte le colonne sono facoltative, compresi nome e cognome. Chi partecipa in presenza risulta comunque aver superato tutti i moduli: i risultati dei test servono alle statistiche."],
     ["Paese: codice di due lettere (AT, DE, IT, PL, ES…) oppure il nome del paese in una delle lingue del progetto. ZZ = preferisce non indicarlo. Elenco nel foglio Paesi."],
@@ -3718,6 +3734,7 @@ function exportTemplate(){
     ["Colonne PRE e POST: valore da 1 a 5 per ciascuna affermazione dell’autovalutazione."],
     ["Colonne GRAD: valore da 1 a 5 per ciascuna domanda del questionario di gradimento (1 = per niente, 5 = moltissimo). Se mancano, si registra 5."],
     ["Codice: lasciare vuoto per i nuovi partecipanti; si compila solo per correggere un partecipante già inserito."],
+    ["Il foglio «Domande e risposte» riporta il testo di ogni domanda e le risposte possibili, nella lingua scelta per la sessione."],
     ["Non modificare la prima riga: le intestazioni servono a riconoscere le colonne."]]),"Istruzioni");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([...PARTNER_C,...ISO_C.filter(c=>!PARTNER_C.includes(c)),NOT_STATED].map(c=>({codice:c, paese:cName(c,"it"), country:cName(c,"en")}))),"Paesi");
   saveXlsx(wb,"3D-Smartbox_modello_risultati.xlsx");
